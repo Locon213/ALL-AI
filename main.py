@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from telegram import Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.request import HTTPXRequest
+from flask import Flask
 
 # Логирование
 logging.basicConfig(
@@ -276,4 +277,32 @@ def main():
     app.run_polling(timeout=120)
 
 if __name__ == "__main__":
-    main()
+    # Запуск Flask (если нужно)
+    app = Flask(__name__)
+
+    @app.route("/")
+    def index():
+        return "Бот работает!"
+
+    # Создаем экземпляр Telegram бота
+    application = Application.builder().token(API_TOKEN).build()
+
+    # Регистрируем обработчики
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("generate", generate))
+    application.add_handler(CallbackQueryHandler(select_model))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
+
+    # Запускаем Flask и бота параллельно
+    from threading import Thread
+
+    def run_flask():
+        app.run(port=5000)
+
+    flask_thread = Thread(target=run_flask)
+    flask_thread.start()
+
+    # Запуск бота
+    logger.info("Запуск Telegram бота...")
+    application.run_polling()
+
