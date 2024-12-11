@@ -10,6 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from telegram.request import HTTPXRequest
 from flask import Flask
 from threading import Thread
+
 # Логирование
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -130,7 +131,7 @@ async def process_description(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         image_data = generate_image(user["model"], prompt)
         if image_data:
-            await send_image(update, image_data,prompt)
+            await send_image(update, image_data, prompt)
         else:
             await update.message.reply_text("❌ Ошибка при генерации изображения. Попробуйте ещё раз!")
     except Exception as e:
@@ -227,7 +228,6 @@ async def send_image(update: Update, image_data: bytes, prompt: str) -> None:
         await update.message.reply_text("⚠️ Ошибка при отправке изображения.")
 
 
-
 # Redo image generation
 async def redo_generation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -252,6 +252,7 @@ async def redo_generation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         logger.error(f"Ошибка при повторной генерации изображения: {e}")
         await query.edit_message_text("⚠️ Ошибка при повторной генерации. Попробуйте позже.")
 
+
 # Main bot function
 def main():
     logger.info("Запуск бота...")
@@ -274,7 +275,8 @@ def main():
     app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
 
     # Start polling
-    app.run_polling(timeout=120)
+    app.run_polling(timeout=120, drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
+
 
 if __name__ == "__main__":
     # Запуск Flask (если нужно)
@@ -284,25 +286,13 @@ if __name__ == "__main__":
     def index():
         return "Бот работает!"
 
-    # Создаем экземпляр Telegram бота
-    application = Application.builder().token(API_TOKEN).build()
-
-    # Регистрируем обработчики
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("generate", generate))
-    application.add_handler(CallbackQueryHandler(select_model))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
-
     # Запускаем Flask и бота параллельно
-    from threading import Thread
-
     def run_flask():
-        app.run(host="0.0.0.0",port=5000)
+        app.run(host="0.0.0.0", port=5000)
 
     flask_thread = Thread(target=run_flask)
     flask_thread.start()
 
     # Запуск бота
     logger.info("Запуск Telegram бота...")
-    application.run_polling()
-
+    main()
