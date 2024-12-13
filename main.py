@@ -369,6 +369,10 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
     app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
 
+    # Ensure JobQueue is set up
+    if not app.job_queue:
+        raise RuntimeError("JobQueue is not set up. Please install python-telegram-bot with job-queue support.")
+
     # Add a job to send ping requests
     app.job_queue.run_repeating(send_ping, interval=60, first=0, context=app)
 
