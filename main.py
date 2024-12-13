@@ -374,7 +374,7 @@ def main():
         raise RuntimeError("JobQueue is not set up. Please install python-telegram-bot with job-queue support.")
 
     # Add a job to send ping requests
-    app.job_queue.run_repeating(send_ping, interval=60, first=0, context=app)
+    app.job_queue.run_repeating(send_ping, interval=60, first=0)
 
     # Start polling
     app.run_polling(timeout=120, drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
