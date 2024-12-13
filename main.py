@@ -10,6 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from telegram.request import HTTPXRequest
 from flask import Flask
 from threading import Thread
+import asyncio
 
 # Логирование
 logging.basicConfig(
@@ -31,8 +32,16 @@ MODELS = {
     "flux_dev": "black-forest-labs/FLUX.1-dev",
     "flux_schnell": "black-forest-labs/FLUX.1-schnell",
     "stable_diffusion": "stabilityai/stable-diffusion-3.5-large",
-    "kandinsky": "kandinsky"
+    "kandinsky": "kandinsky",
+    "hermes_llama": "NousResearch/Hermes-3-Llama-3.1-8B",
+    "phi_3_5_mini": "microsoft/Phi-3.5-mini-instruct",
+    "gemma_2_9b": "google/gemma-2-9b-it",
+    "mistral_nemo": "mistralai/Mistral-Nemo-Instruct-2407"
 }
+
+# Категории моделей
+IMAGE_MODELS = ["flux_dev", "flux_schnell", "stable_diffusion", "kandinsky"]
+TEXT_MODELS = ["hermes_llama", "phi_3_5_mini", "gemma_2_9b", "mistral_nemo"]
 
 # Хранилище данных пользователей
 user_data = {}
@@ -55,14 +64,14 @@ async def is_subscribed(update: Update) -> bool:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Пользователь начал взаимодействие с ботом.")
     await update.message.reply_text(
-        "👋 Привет! Я бот ALL AI Other. 🎨\n"
-        "Я могу создавать изображения на основе текста.\n"
-        "Попробуй команду /generate, чтобы начать! 🚀"
+        "👋 Привет! Я бот ALL AI Other. 🎨💬\n"
+        "Я могу создавать изображения на основе текста и общаться с текстовыми моделями.\n"
+        "Попробуй команды /generate_image или /generate_text, чтобы начать! 🚀"
     )
 
 
 # Генерация изображения
-async def generate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def generate_image_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.message.from_user.id
     if not await is_subscribed(update):
         await update.message.reply_text(
@@ -87,7 +96,38 @@ async def generate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "Выберите модель для генерации:",
+        "Выберите модель для генерации изображения:",
+        reply_markup=reply_markup
+    )
+
+
+# Генерация текста
+async def generate_text_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.message.from_user.id
+    if not await is_subscribed(update):
+        await update.message.reply_text(
+            "❌ Вы должны подписаться на канал [All AI News](https://t.me/AllAI_News_bot), чтобы использовать бота.",
+            parse_mode="Markdown"
+        )
+        return
+
+    last_request = user_data.get(user_id, {}).get("last_request")
+    if last_request and datetime.now() - last_request < timedelta(minutes=1):
+        remaining_time = timedelta(minutes=1) - (datetime.now() - last_request)
+        seconds = remaining_time.total_seconds()
+        await update.message.reply_text(f"⏳ Пожалуйста, подождите {int(seconds)} секунд перед новой генерацией.")
+        return
+
+    keyboard = [
+        [InlineKeyboardButton("Hermes LLaMA 🦙", callback_data="hermes_llama")],
+        [InlineKeyboardButton("Phi-3.5 Mini 🤖", callback_data="phi_3_5_mini")],
+        [InlineKeyboardButton("Gemma 2.9B 🌐", callback_data="gemma_2_9b")],
+        [InlineKeyboardButton("Mistral Nemo 🌟", callback_data="mistral_nemo")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "Выберите модель для генерации текста:",
         reply_markup=reply_markup
     )
 
@@ -101,10 +141,16 @@ async def select_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user_data[user_id] = user_data.get(user_id, {})
     user_data[user_id]["model"] = query.data
 
-    if query.message:
-        await query.edit_message_text("Модель выбрана. ✍️ Напишите описание изображения.")
-    else:
-        logger.warning("Не удалось отредактировать сообщение: сообщение отсутствует.")
+    if query.data in IMAGE_MODELS:
+        if query.message:
+            await query.edit_message_text("Модель выбрана. ✍️ Напишите описание изображения.")
+        else:
+            logger.warning("Не удалось отредактировать сообщение: сообщение отсутствует.")
+    elif query.data in TEXT_MODELS:
+        if query.message:
+            await query.edit_message_text("Модель выбрана. ✍️ Напишите ваш запрос.")
+        else:
+            logger.warning("Не удалось отредактировать сообщение: сообщение отсутствует.")
 
 
 # Обработка описания
@@ -112,7 +158,7 @@ async def process_description(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.message.from_user.id
     user = user_data.get(user_id, {})
     if not user.get("model"):
-        await update.message.reply_text("⚠️ Сначала выберите модель с помощью команды /generate.")
+        await update.message.reply_text("⚠️ Сначала выберите модель с помощью команды /generate_image или /generate_text.")
         return
 
     prompt = update.message.text
@@ -125,17 +171,24 @@ async def process_description(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(f"⏳ Пожалуйста, подождите {int(seconds)} секунд перед новой генерацией.")
         return
 
-    await update.message.reply_text("⏳ Генерация изображения... Это может занять немного времени.")
+    await update.message.reply_text("⏳ Генерация... Это может занять немного времени.")
     user_data[user_id]["last_request"] = datetime.now()
 
     try:
-        image_data = generate_image(user["model"], prompt)
-        if image_data:
-            await send_image(update, image_data, prompt)
-        else:
-            await update.message.reply_text("❌ Ошибка при генерации изображения. Попробуйте ещё раз!")
+        if user["model"] in IMAGE_MODELS:
+            content = generate_image(user["model"], prompt)
+            if content:
+                await send_image(update, content, prompt)
+            else:
+                await update.message.reply_text("❌ Ошибка при генерации изображения. Попробуйте ещё раз!")
+        elif user["model"] in TEXT_MODELS:
+            content = generate_text(user["model"], prompt)
+            if content:
+                await send_text(update, content, prompt)
+            else:
+                await update.message.reply_text("❌ Ошибка при генерации текста. Попробуйте ещё раз!")
     except Exception as e:
-        logger.error(f"Ошибка при генерации изображения: {e}")
+        logger.error(f"Ошибка при генерации: {e}")
         await update.message.reply_text("⚠️ Произошла ошибка. Попробуйте позже.")
 
 
@@ -197,6 +250,14 @@ def generate_image_kandinsky(prompt: str) -> bytes:
         return None
 
 
+# Генерация текста через Hugging Face API
+def generate_text(model: str, prompt: str) -> str:
+    url = f"{FLUX_API_URL}{MODELS[model]}"
+    headers = {"Authorization": f"Bearer {HUGGINGFACE_API_TOKEN}"}
+    response = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=120)
+    response.raise_for_status()
+    return response.json()[0]["generated_text"]
+
 # Отправка изображения
 async def send_image(update: Update, image_data: bytes, prompt: str) -> None:
     try:
@@ -228,7 +289,23 @@ async def send_image(update: Update, image_data: bytes, prompt: str) -> None:
         await update.message.reply_text("⚠️ Ошибка при отправке изображения.")
 
 
-# Redo image generation
+# Отправка текста
+async def send_text(update: Update, text: str, prompt: str) -> None:
+    try:
+        user_id = update.message.from_user.id
+
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Переделать", callback_data="redo")]])
+
+        await update.message.reply_text(
+            text=text,
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при отправке текста: {e}")
+        await update.message.reply_text("⚠️ Ошибка при отправке текста.")
+
+
+# Redo generation
 async def redo_generation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     user_id = query.from_user.id
@@ -241,16 +318,33 @@ async def redo_generation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     prompt = user_data[user_id]["prompt"]
     model = user_data[user_id]["model"]
 
-    await query.edit_message_text("⏳ Повторная генерация изображения. Подождите немного...")
+    await query.edit_message_text("⏳ Повторная генерация. Подождите немного...")
     try:
-        image_data = generate_image(model, prompt)
-        if image_data:
-            await send_image(query, image_data, prompt)
-        else:
-            await query.edit_message_text("❌ Ошибка при повторной генерации изображения.")
+        if model in IMAGE_MODELS:
+            content = generate_image(model, prompt)
+            if content:
+                await send_image(query, content, prompt)
+            else:
+                await query.edit_message_text("❌ Ошибка при повторной генерации изображения.")
+        elif model in TEXT_MODELS:
+            content = generate_text(model, prompt)
+            if content:
+                await send_text(query, content, prompt)
+            else:
+                await query.edit_message_text("❌ Ошибка при повторной генерации текста.")
     except Exception as e:
-        logger.error(f"Ошибка при повторной генерации изображения: {e}")
+        logger.error(f"Ошибка при повторной генерации: {e}")
         await query.edit_message_text("⚠️ Ошибка при повторной генерации. Попробуйте позже.")
+
+
+# Пинг-запросы для предотвращения отключения бота
+async def send_ping(context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        # Замените YOUR_CHAT_ID на фактический ID чата для пинга
+        await context.bot.send_chat_action(chat_id=YOUR_CHAT_ID, action="typing")
+        logger.info("Пинг отправлен.")
+    except Exception as e:
+        logger.error(f"Ошибка при отправке пинга: {e}")
 
 
 # Main bot function
@@ -269,10 +363,14 @@ def main():
 
     # Add command and callback handlers
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("generate", generate))
+    app.add_handler(CommandHandler("generate_image", generate_image_command))
+    app.add_handler(CommandHandler("generate_text", generate_text_command))
     app.add_handler(CallbackQueryHandler(select_model))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
     app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
+
+    # Add a job to send ping requests
+    app.job_queue.run_repeating(send_ping, interval=60, first=0, context=app)
 
     # Start polling
     app.run_polling(timeout=120, drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
