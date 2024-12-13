@@ -50,7 +50,7 @@ user_data = {}
 PING_CHANNEL_ID = "@ALLAIPING"
 
 # Максимальное количество токенов для текстовых моделей
-MAX_TOKENS = 2048
+MAX_TOKENS = 8192
 
 # Проверка подписки на канал
 async def is_subscribed(update: Update) -> bool:
