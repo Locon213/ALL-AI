@@ -46,6 +46,11 @@ TEXT_MODELS = ["hermes_llama", "phi_3_5_mini", "gemma_2_9b", "mistral_nemo"]
 # Хранилище данных пользователей
 user_data = {}
 
+# ID канала для пинга
+PING_CHANNEL_ID = "@ALLAIPING"
+
+# Максимальное количество токенов для текстовых моделей
+MAX_TOKENS = 2048
 
 # Проверка подписки на канал
 async def is_subscribed(update: Update) -> bool:
@@ -59,7 +64,6 @@ async def is_subscribed(update: Update) -> bool:
         logger.error(f"Ошибка при проверке подписки: {e}")
         return False
 
-
 # Приветственное сообщение
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Пользователь начал взаимодействие с ботом.")
@@ -68,7 +72,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Я могу создавать изображения на основе текста и общаться с текстовыми моделями.\n"
         "Попробуй команды /generate_image или /generate_text, чтобы начать! 🚀"
     )
-
 
 # Генерация изображения
 async def generate_image_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -100,7 +103,6 @@ async def generate_image_command(update: Update, context: ContextTypes.DEFAULT_T
         reply_markup=reply_markup
     )
 
-
 # Генерация текста
 async def generate_text_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.message.from_user.id
@@ -131,7 +133,6 @@ async def generate_text_command(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup=reply_markup
     )
 
-
 # Обработка выбора модели
 async def select_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -151,7 +152,6 @@ async def select_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await query.edit_message_text("Модель выбрана. ✍️ Напишите ваш запрос.")
         else:
             logger.warning("Не удалось отредактировать сообщение: сообщение отсутствует.")
-
 
 # Обработка описания
 async def process_description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -191,7 +191,6 @@ async def process_description(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.error(f"Ошибка при генерации: {e}")
         await update.message.reply_text("⚠️ Произошла ошибка. Попробуйте позже.")
 
-
 # Генерация изображения через API
 def generate_image(model: str, prompt: str) -> bytes:
     if model == "kandinsky":
@@ -202,7 +201,6 @@ def generate_image(model: str, prompt: str) -> bytes:
         response = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=120)
         response.raise_for_status()
         return response.content
-
 
 # Генерация изображения через Kandinsky
 def generate_image_kandinsky(prompt: str) -> bytes:
@@ -249,12 +247,17 @@ def generate_image_kandinsky(prompt: str) -> bytes:
         logger.error(f"Ошибка генерации через Kandinsky: {e}")
         return None
 
-
 # Генерация текста через Hugging Face API
 def generate_text(model: str, prompt: str) -> str:
     url = f"{FLUX_API_URL}{MODELS[model]}"
     headers = {"Authorization": f"Bearer {HUGGINGFACE_API_TOKEN}"}
-    response = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=120)
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_length": MAX_TOKENS
+        }
+    }
+    response = requests.post(url, headers=headers, json=payload, timeout=120)
     response.raise_for_status()
     return response.json()[0]["generated_text"]
 
@@ -340,8 +343,8 @@ async def redo_generation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # Пинг-запросы для предотвращения отключения бота
 async def send_ping(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
-        # Замените YOUR_CHAT_ID на фактический ID чата для пинга
-        await context.bot.send_chat_action(chat_id=2417783860, action="typing")
+        # Используем имя канала для пинга
+        await context.bot.send_chat_action(chat_id=PING_CHANNEL_ID, action="typing")
         logger.info("Пинг отправлен.")
     except Exception as e:
         logger.error(f"Ошибка при отправке пинга: {e}")
