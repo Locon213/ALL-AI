@@ -341,7 +341,7 @@ async def redo_generation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def send_ping(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         # Замените YOUR_CHAT_ID на фактический ID чата для пинга
-        await context.bot.send_chat_action(chat_id=YOUR_CHAT_ID, action="typing")
+        await context.bot.send_chat_action(chat_id=@ALLAIPING, action="typing")
         logger.info("Пинг отправлен.")
     except Exception as e:
         logger.error(f"Ошибка при отправке пинга: {e}")
