@@ -399,13 +399,15 @@ def main():
     # Создание Flask приложения с новым именем
     flask_app = Flask(__name__)
 
-    @flask_app.route("/", methods=["POST", "HEAD"])  # Добавляем поддержку метода HEAD
+    @flask_app.route("/", methods=["GET", "POST", "HEAD"])  # Добавляем поддержку метода GET
     def index():
         if request.method == "POST":
             json_data = request.get_json(force=True)
             update = Update.de_json(json_data, app.bot)  # Используйте app.bot для обработки обновлений
             asyncio.run(handle_webhook(update, app))  # Передайте app в качестве контекста
             return jsonify({"status": "ok"})
+        elif request.method == "GET":
+            return "Бот работает!", 200  # Ответ на GET-запрос
         elif request.method == "HEAD":
             # Ответ на метод HEAD
             return "", 200  # Возвращаем пустой ответ с кодом 200
