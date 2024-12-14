@@ -375,6 +375,7 @@ async def setup_webhook(app: Application, webhook_url: str) -> None:
 
 # Main bot function
 def main():
+    global app  # Сделаем app глобальной переменной
     logger.info("Запуск бота...")
 
     # HTTPX request configuration
