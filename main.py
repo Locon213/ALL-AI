@@ -383,10 +383,6 @@ if __name__ == "__main__":
         if request.method == "POST":
             json_data = request.get_json(force=True)
             update = Update.de_json(json_data, app.bot)  # Используйте app.bot для обработки обновлений
-
-            # Инициализация приложения перед обработкой обновлений
-            app.initialize()
-
             asyncio.run(handle_webhook(update, app))  # Передайте app в качестве контекста
             return jsonify({"status": "ok"})
         elif request.method == "HEAD":
@@ -398,6 +394,9 @@ if __name__ == "__main__":
 
     # Создание Telegram Bot приложения
     app = Application.builder().token(API_TOKEN).request(httpx_request).build()
+
+    # Инициализация приложения
+    app.initialize()
 
     # Добавление обработчиков команд и колбэков
     app.add_handler(CommandHandler("start", start))
@@ -421,5 +420,3 @@ if __name__ == "__main__":
     asyncio.run(setup_webhook(app, WEBHOOK_URL))
 
     logger.info("Бот запущен с вебхуком...")
-if __name__ == "__main__":
-    main()
