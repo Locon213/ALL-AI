@@ -389,9 +389,7 @@ def main():
     app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
 
     
-    # Start polling
-    app.run_polling(timeout=120, drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
-
+    
 if __name__ == "__main__":
     # Запуск Flask (если нужно)
     app = Flask(__name__)
