@@ -12,6 +12,13 @@ from flask import Flask
 from threading import Thread
 import asyncio
 
+# Создайте объект HTTPXRequest
+httpx_request = HTTPXRequest(
+    read_timeout=120,
+    write_timeout=120,
+    connect_timeout=120
+)
+
 # Логирование
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
