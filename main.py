@@ -358,9 +358,9 @@ async def handle_webhook(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.error(f"Ошибка при обработке запроса: {e}")
 
 # Настройка вебхука
-def setup_webhook(app: Application, webhook_url: str) -> None:
+async def setup_webhook(app: Application, webhook_url: str) -> None:
     try:
-        app.bot.set_webhook(url=webhook_url)
+        await app.bot.set_webhook(url=webhook_url)
         logger.info(f"Вебхук установлен на {webhook_url}")
     except Exception as e:
         logger.error(f"Ошибка при установке вебхука: {e}")
@@ -392,7 +392,6 @@ def main():
     # Start polling
     app.run_polling(timeout=120, drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
-
 if __name__ == "__main__":
     # Запуск Flask (если нужно)
     app = Flask(__name__)
@@ -422,6 +421,15 @@ if __name__ == "__main__":
 
     # Настройка вебхука
     WEBHOOK_URL = "https://all-ai-mdjo.onrender.com"  # Замените на ваш реальный URL Render
-    setup_webhook(app, WEBHOOK_URL)
+
+    # Запуск Flask в отдельном потоке
+    def run_flask():
+        app.run(host="0.0.0.0", port=5000)
+
+    flask_thread = Thread(target=run_flask)
+    flask_thread.start()
+
+    # Настройка вебхука асинхронно
+    asyncio.run(setup_webhook(app, WEBHOOK_URL))
 
     logger.info("Бот запущен с вебхуком...")
