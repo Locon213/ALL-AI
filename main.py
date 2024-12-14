@@ -391,43 +391,38 @@ def main():
     
     
 if __name__ == "__main__":
-    # Запуск Flask (если нужно)
-    app = Flask(__name__)
+    # Создание Flask приложения с новым именем
+flask_app = Flask(__name__)
 
-    @app.route("/", methods=["POST"])
-    def index():
-        update = Update.de_json(request.get_json(force=True), app.bot)
-        asyncio.run(handle_webhook(update, ContextTypes.DEFAULT_TYPE()))
-        return jsonify({"status": "ok"})
+@flask_app.route("/", methods=["POST"])
+def index():
+    json_data = request.get_json(force=True)
+    update = Update.de_json(json_data, app.bot)  # Используйте app.bot для обработки обновлений
+    asyncio.run(handle_webhook(update, app))  # Передайте app в качестве контекста
+    return jsonify({"status": "ok"})
 
-    # Создание бота
-    httpx_request = HTTPXRequest(
-        read_timeout=120,
-        write_timeout=120,
-        connect_timeout=120
-    )
+# Создание Telegram Bot приложения
+app = Application.builder().token(API_TOKEN).request(httpx_request).build()
 
-    app = Application.builder().token(API_TOKEN).request(httpx_request).build()
+# Добавление обработчиков команд и колбэков
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("generate_image", generate_image_command))
+app.add_handler(CommandHandler("generate_text", generate_text_command))
+app.add_handler(CallbackQueryHandler(select_model))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
+app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
 
-    # Добавление обработчиков
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("generate_image", generate_image_command))
-    app.add_handler(CommandHandler("generate_text", generate_text_command))
-    app.add_handler(CallbackQueryHandler(select_model))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
-    app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
+# Настройка вебхука
+WEBHOOK_URL = "https://all-ai-mdjo.onrender.com"  # Замените на ваш реальный URL Render
 
-    # Настройка вебхука
-    WEBHOOK_URL = "https://all-ai-mdjo.onrender.com"  # Замените на ваш реальный URL Render
+# Запуск Flask в отдельном потоке
+def run_flask():
+    flask_app.run(host="0.0.0.0", port=5000)  # Используйте flask_app для запуска Flask
 
-    # Запуск Flask в отдельном потоке
-    def run_flask():
-        app.run(host="0.0.0.0", port=5000)
+flask_thread = Thread(target=run_flask)
+flask_thread.start()
 
-    flask_thread = Thread(target=run_flask)
-    flask_thread.start()
+# Настройка вебхука асинхронно
+asyncio.run(setup_webhook(app, WEBHOOK_URL))
 
-    # Настройка вебхука асинхронно
-    asyncio.run(setup_webhook(app, WEBHOOK_URL))
-
-    logger.info("Бот запущен с вебхуком...")
+logger.info("Бот запущен с вебхуком...")
