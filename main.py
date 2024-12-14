@@ -350,6 +350,22 @@ async def send_ping(context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.error(f"Ошибка при отправке пинга: {e}")
 
 
+# Обработчик запросов для вебхука
+async def handle_webhook(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        await app.process_update(update)
+    except Exception as e:
+        logger.error(f"Ошибка при обработке запроса: {e}")
+
+# Настройка вебхука
+def setup_webhook(app: Application, webhook_url: str) -> None:
+    try:
+        app.bot.set_webhook(url=webhook_url)
+        logger.info(f"Вебхук установлен на {webhook_url}")
+    except Exception as e:
+        logger.error(f"Ошибка при установке вебхука: {e}")
+
+
 # Main bot function
 def main():
     logger.info("Запуск бота...")
@@ -372,13 +388,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
     app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
 
-    # Ensure JobQueue is set up
-    if not app.job_queue:
-        raise RuntimeError("JobQueue is not set up. Please install python-telegram-bot with job-queue support.")
-
-    # Add a job to send ping requests
-    app.job_queue.run_repeating(send_ping, interval=60, first=0)
-
+    
     # Start polling
     app.run_polling(timeout=120, drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
@@ -387,17 +397,31 @@ if __name__ == "__main__":
     # Запуск Flask (если нужно)
     app = Flask(__name__)
 
-    @app.route("/")
+    @app.route("/", methods=["POST"])
     def index():
-        return "Бот работает!"
+        update = Update.de_json(request.get_json(force=True), app.bot)
+        asyncio.run(handle_webhook(update, ContextTypes.DEFAULT_TYPE()))
+        return jsonify({"status": "ok"})
 
-    # Запускаем Flask и бота параллельно
-    def run_flask():
-        app.run(host="0.0.0.0", port=5000)
+    # Создание бота
+    httpx_request = HTTPXRequest(
+        read_timeout=120,
+        write_timeout=120,
+        connect_timeout=120
+    )
 
-    flask_thread = Thread(target=run_flask)
-    flask_thread.start()
+    app = Application.builder().token(API_TOKEN).request(httpx_request).build()
 
-    # Запуск бота
-    logger.info("Запуск Telegram бота...")
-    main()
+    # Добавление обработчиков
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("generate_image", generate_image_command))
+    app.add_handler(CommandHandler("generate_text", generate_text_command))
+    app.add_handler(CallbackQueryHandler(select_model))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
+    app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
+
+    # Настройка вебхука
+    WEBHOOK_URL = "https://all-ai-mdjo.onrender.com"  # Замените на ваш реальный URL Render
+    setup_webhook(app, WEBHOOK_URL)
+
+    logger.info("Бот запущен с вебхуком...")
