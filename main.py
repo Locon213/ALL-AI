@@ -374,21 +374,32 @@ async def setup_webhook(app: Application, webhook_url: str) -> None:
 
 
 # Main bot function
-def main():
-    global app  # Сделаем app глобальной переменной
-    logger.info("Запуск бота...")
+if __name__ == "__main__":
+    # Создание Flask приложения с новым именем
+    flask_app = Flask(__name__)
 
-    # HTTPX request configuration
-    httpx_request = HTTPXRequest(
-        read_timeout=120,
-        write_timeout=120,
-        connect_timeout=120
-    )
+    @flask_app.route("/", methods=["POST", "HEAD", "GET"])  # Добавляем поддержку методов HEAD и GET
+    def index():
+        if request.method == "POST":
+            json_data = request.get_json(force=True)
+            update = Update.de_json(json_data, app.bot)  # Используйте app.bot для обработки обновлений
 
-    # Create the bot application
+            # Инициализация приложения перед обработкой обновлений
+            app.initialize()
+
+            asyncio.run(handle_webhook(update, app))  # Передайте app в качестве контекста
+            return jsonify({"status": "ok"})
+        elif request.method == "HEAD":
+            # Ответ на метод HEAD
+            return "", 200  # Возвращаем пустой ответ с кодом 200
+        elif request.method == "GET":
+            # Ответ на метод GET
+            return jsonify({"status": "Service is running"}), 200  # Возвращаем JSON с сообщением
+
+    # Создание Telegram Bot приложения
     app = Application.builder().token(API_TOKEN).request(httpx_request).build()
 
-    # Add command and callback handlers
+    # Добавление обработчиков команд и колбэков
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("generate_image", generate_image_command))
     app.add_handler(CommandHandler("generate_text", generate_text_command))
@@ -396,21 +407,8 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
     app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
 
-    # Создание Flask приложения с новым именем
-    flask_app = Flask(__name__)
-
-    @flask_app.route("/", methods=["GET", "POST", "HEAD"])  # Добавляем поддержку метода GET
-    def index():
-        if request.method == "POST":
-            json_data = request.get_json(force=True)
-            update = Update.de_json(json_data, app.bot)  # Используйте app.bot для обработки обновлений
-            asyncio.run(handle_webhook(update, app))  # Передайте app в качестве контекста
-            return jsonify({"status": "ok"})
-        elif request.method == "GET":
-            return "Бот работает!", 200  # Ответ на GET-запрос
-        elif request.method == "HEAD":
-            # Ответ на метод HEAD
-            return "", 200  # Возвращаем пустой ответ с кодом 200
+    # Настройка вебхука
+    WEBHOOK_URL = "https://all-ai-mdjo.onrender.com"  # Замените на ваш реальный URL Render
 
     # Запуск Flask в отдельном потоке
     def run_flask():
@@ -420,10 +418,8 @@ def main():
     flask_thread.start()
 
     # Настройка вебхука асинхронно
-    WEBHOOK_URL = "https://all-ai-mdjo.onrender.com"  # Замените на ваш реальный URL Render
     asyncio.run(setup_webhook(app, WEBHOOK_URL))
 
     logger.info("Бот запущен с вебхуком...")
-
 if __name__ == "__main__":
     main()
