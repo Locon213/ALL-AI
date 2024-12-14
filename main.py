@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from telegram import Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.request import HTTPXRequest
-from flask import Flask
+from flask import Flask, request, jsonify
 from threading import Thread
 import asyncio
 
@@ -395,9 +395,6 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
     app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
 
-    
-    
-if __name__ == "__main__":
     # Создание Flask приложения с новым именем
     flask_app = Flask(__name__)
 
@@ -412,20 +409,6 @@ if __name__ == "__main__":
             # Ответ на метод HEAD
             return "", 200  # Возвращаем пустой ответ с кодом 200
 
-    # Создание Telegram Bot приложения
-    app = Application.builder().token(API_TOKEN).request(httpx_request).build()
-
-    # Добавление обработчиков команд и колбэков
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("generate_image", generate_image_command))
-    app.add_handler(CommandHandler("generate_text", generate_text_command))
-    app.add_handler(CallbackQueryHandler(select_model))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_description))
-    app.add_handler(CallbackQueryHandler(redo_generation, pattern="^redo$"))
-
-    # Настройка вебхука
-    WEBHOOK_URL = "https://all-ai-mdjo.onrender.com"  # Замените на ваш реальный URL Render
-
     # Запуск Flask в отдельном потоке
     def run_flask():
         flask_app.run(host="0.0.0.0", port=5000)  # Используйте flask_app для запуска Flask
@@ -434,6 +417,10 @@ if __name__ == "__main__":
     flask_thread.start()
 
     # Настройка вебхука асинхронно
+    WEBHOOK_URL = "https://all-ai-mdjo.onrender.com"  # Замените на ваш реальный URL Render
     asyncio.run(setup_webhook(app, WEBHOOK_URL))
 
     logger.info("Бот запущен с вебхуком...")
+
+if __name__ == "__main__":
+    main()
