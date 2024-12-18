@@ -396,7 +396,7 @@ if __name__ == "__main__":
     app = Application.builder().token(API_TOKEN).request(httpx_request).build()
 
     # Инициализация приложения
-    app.initialize()
+    asyncio.run(app.initialize())
 
     # Добавление обработчиков команд и колбэков
     app.add_handler(CommandHandler("start", start))
