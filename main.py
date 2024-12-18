@@ -396,7 +396,7 @@ if __name__ == "__main__":
     app = Application.builder().token(API_TOKEN).request(httpx_request).build()
 
     # Инициализация приложения
-    asyncio.run(app.initialize())
+    asyncio.create_task(app.initialize())
 
     # Добавление обработчиков команд и колбэков
     app.add_handler(CommandHandler("start", start))
@@ -417,6 +417,6 @@ if __name__ == "__main__":
     flask_thread.start()
 
     # Настройка вебхука асинхронно
-    asyncio.run(setup_webhook(app, WEBHOOK_URL))
+    asyncio.create_task(setup_webhook(app, WEBHOOK_URL))
 
     logger.info("Бот запущен с вебхуком...")
