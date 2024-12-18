@@ -17,6 +17,8 @@ httpx_request = HTTPXRequest(
     read_timeout=120,
     write_timeout=120,
     connect_timeout=120
+    http_version="2",  # Используем HTTP/2 для более эффективного использования соединений
+    limits=httpx.Limits(max_connections=100, max_keepalive_connections=20)  # Увеличиваем количество соединений
 )
 
 # Логирование
